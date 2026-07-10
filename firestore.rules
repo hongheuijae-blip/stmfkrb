@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{collection}/{docId} {
+      allow read: if true;
+      allow write: if false; // Admin SDK(서비스 계정)는 규칙과 무관하게 항상 허용
+    }
+  }
+}

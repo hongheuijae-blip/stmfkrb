@@ -1,0 +1,39 @@
+name: Build and Upload APK
+on:
+  push:
+    branches: [main]
+    paths: ['android/**']
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > android/app/google-services.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - working-directory: scripts
+        run: npm install
+      - name: Upload APK to Drive
+        working-directory: scripts
+        run: node uploadToDrive.js ../android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          DRIVE_APK_FOLDER_ID: ${{ secrets.DRIVE_APK_FOLDER_ID }}
+          DRIVE_APK_FILE_NAME: steampunk-game-latest.apk
