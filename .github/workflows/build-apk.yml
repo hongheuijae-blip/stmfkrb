@@ -22,14 +22,16 @@ jobs:
       - name: Build APK
         working-directory: android
         run: |
-  chmod +x gradlew
-  ./gradlew :app:assembleDebug --stacktrace
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --stacktrace
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - working-directory: scripts
         run: npm install
+
       - name: Upload APK to Drive
         working-directory: scripts
         run: node uploadToDrive.js ../android/app/build/outputs/apk/debug/app-debug.apk
