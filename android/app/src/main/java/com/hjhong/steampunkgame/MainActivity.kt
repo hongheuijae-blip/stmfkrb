@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 var selectedTab by remember { mutableStateOf(0) }
-                val tabs = listOf("몬스터", "무기", "도시", "퀘스트", "로봇")
+                val tabs = listOf("탐험", "몬스터", "무기", "도시", "퀘스트", "로봇")
 
                 Column(modifier = Modifier.fillMaxSize()) {
                     TabRow(selectedTabIndex = selectedTab) {
@@ -49,11 +49,12 @@ class MainActivity : ComponentActivity() {
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         when (selectedTab) {
-                            0 -> MonsterScreen(monsterViewModel, robotViewModel)
-                            1 -> WeaponScreen(weaponViewModel)
-                            2 -> CityScreen(cityViewModel)
-                            3 -> QuestScreen(questViewModel)
-                            4 -> RobotScreen(robotViewModel)
+                            0 -> ExplorationScreen(monsterViewModel, robotViewModel)
+                            1 -> MonsterScreen(monsterViewModel, robotViewModel)
+                            2 -> WeaponScreen(weaponViewModel)
+                            3 -> CityScreen(cityViewModel)
+                            4 -> QuestScreen(questViewModel)
+                            5 -> RobotScreen(robotViewModel)
                         }
                     }
                 }
@@ -62,7 +63,44 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ───────────── 몬스터 (+ 전투 진입) ─────────────
+// ───────────── 탐험 (오버월드 + 조우 전투) ─────────────
+
+@Composable
+fun ExplorationScreen(monsterViewModel: MonsterViewModel, robotViewModel: RobotViewModel) {
+    val navController = rememberNavController()
+    val monsters by monsterViewModel.monsters.collectAsState()
+
+    NavHost(navController, startDestination = "map") {
+        composable("map") {
+            if (monsters.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("몬스터 데이터가 없어 탐험할 수 없습니다. 먼저 데이터를 생성해주세요.")
+                }
+            } else {
+                OverworldScreen(
+                    monsters = monsters,
+                    onEncounter = { monster ->
+                        navController.navigate("combat/${monster.id}")
+                    }
+                )
+            }
+        }
+        composable("combat/{id}") { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id") ?: ""
+            val monster = monsters.find { it.id == id }
+            if (monster != null) {
+                CombatScreen(
+                    monster = monster,
+                    playerAttack = robotViewModel.totalAttack(),
+                    playerDefense = robotViewModel.totalDefense(),
+                    onExit = { navController.popBackStack("map", inclusive = false) }
+                )
+            }
+        }
+    }
+}
+
+// ───────────── 몬스터 (도감 + 전투 진입) ─────────────
 
 @Composable
 fun MonsterScreen(viewModel: MonsterViewModel, robotViewModel: RobotViewModel) {
