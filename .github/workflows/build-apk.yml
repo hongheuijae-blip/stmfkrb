@@ -23,7 +23,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --stacktrace
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon -Pandroid.useAndroidX=true
 
       - uses: actions/setup-node@v4
         with:
