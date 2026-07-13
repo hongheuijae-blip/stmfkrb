@@ -9,5 +9,7 @@ data class Monster(
     val defense: Int = 0,
     val element: String = "",
     val lore: String = "",
-    val imagePath: String = ""
+    val imagePath: String = "",
+    val scripture: String = "",
+    val scriptureRef: String = ""
 )
