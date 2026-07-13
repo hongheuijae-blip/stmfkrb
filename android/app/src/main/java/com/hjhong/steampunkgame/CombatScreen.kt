@@ -13,9 +13,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.*
 
 private const val ARENA_W = 800f
