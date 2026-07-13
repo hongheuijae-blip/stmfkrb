@@ -1,15 +1,16 @@
-// generate.js에서 이미지 업로드용, build-apk.yml에서 APK 업로드용으로 공용 사용
 const { google } = require("googleapis");
 const fs = require("fs");
 const path = require("path");
 
 function getDriveClient() {
-  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ["https://www.googleapis.com/auth/drive"],
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_OAUTH_CLIENT_ID,
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET
+  );
+  oauth2Client.setCredentials({
+    refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN,
   });
-  return google.drive({ version: "v3", auth });
+  return google.drive({ version: "v3", auth: oauth2Client });
 }
 
 async function uploadOrReplace(drive, folderId, filePath, fileName, mimeType) {
@@ -39,7 +40,6 @@ async function uploadOrReplace(drive, folderId, filePath, fileName, mimeType) {
   }
 }
 
-// CLI 실행 시 (APK 업로드용): node uploadToDrive.js <파일경로>
 if (require.main === module) {
   (async () => {
     const filePath = process.argv[2];

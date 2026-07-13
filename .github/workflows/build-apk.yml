@@ -41,6 +41,8 @@ jobs:
         working-directory: scripts
         run: node uploadToDrive.js ../android/app/build/outputs/apk/debug/app-debug.apk
         env:
-          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
           DRIVE_APK_FOLDER_ID: ${{ secrets.DRIVE_APK_FOLDER_ID }}
           DRIVE_APK_FILE_NAME: steampunk-game-latest.apk
