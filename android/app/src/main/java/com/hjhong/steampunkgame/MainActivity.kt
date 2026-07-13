@@ -1,5 +1,6 @@
 package com.hjhong.steampunkgame
 
+import androidx.compose.ui.Alignment
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
