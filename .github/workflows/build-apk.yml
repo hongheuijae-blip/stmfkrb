@@ -32,10 +32,11 @@ jobs:
       - working-directory: scripts
         run: npm install
 
+      - name: Debug - check folder id length
+        run: echo "DRIVE_APK_FOLDER_ID length is ${#DRIVE_APK_FOLDER_ID}"
+        env:
+          DRIVE_APK_FOLDER_ID: ${{ secrets.DRIVE_APK_FOLDER_ID }}
+
       - name: Upload APK to Drive
         working-directory: scripts
-        run: node uploadToDrive.js ../android/app/build/outputs/apk/debug/app-debug.apk
-        env:
-          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
-          DRIVE_APK_FOLDER_ID: ${{ secrets.DRIVE_APK_FOLDER_ID }}
-          DRIVE_APK_FILE_NAME: steampunk-game-latest.apk
+        run:
