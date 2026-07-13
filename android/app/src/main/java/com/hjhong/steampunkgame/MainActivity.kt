@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         when (selectedTab) {
-                            0 -> MonsterScreen(monsterViewModel)
+                            0 -> MonsterScreen(monsterViewModel, robotViewModel)
                             1 -> WeaponScreen(weaponViewModel)
                             2 -> CityScreen(cityViewModel)
                             3 -> QuestScreen(questViewModel)
@@ -62,10 +62,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ───────────── 몬스터 ─────────────
+// ───────────── 몬스터 (+ 전투 진입) ─────────────
 
 @Composable
-fun MonsterScreen(viewModel: MonsterViewModel) {
+fun MonsterScreen(viewModel: MonsterViewModel, robotViewModel: RobotViewModel) {
     val navController = rememberNavController()
     NavHost(navController, startDestination = "list") {
         composable("list") {
@@ -84,20 +84,40 @@ fun MonsterScreen(viewModel: MonsterViewModel) {
             val id = backStackEntry.arguments?.getString("id") ?: ""
             val monster = viewModel.monsters.collectAsState().value.find { it.id == id }
             if (monster != null) {
-                DetailScreen(
-                    title = monster.name,
-                    imagePath = monster.imagePath,
-                    stats = listOf(
-                        "레벨" to "${monster.level}",
-                        "HP" to "${monster.hp}",
-                        "공격력" to "${monster.attack}",
-                        "방어력" to "${monster.defense}",
-                        "속성" to monster.element
-                    ),
-                    description = monster.lore,
-                    scripture = monster.scripture,
-                    scriptureRef = monster.scriptureRef,
-                    onBack = { navController.popBackStack() }
+                Column(modifier = Modifier.fillMaxSize()) {
+                    DetailScreen(
+                        title = monster.name,
+                        imagePath = monster.imagePath,
+                        stats = listOf(
+                            "레벨" to "${monster.level}",
+                            "HP" to "${monster.hp}",
+                            "공격력" to "${monster.attack}",
+                            "방어력" to "${monster.defense}",
+                            "속성" to monster.element
+                        ),
+                        description = monster.lore,
+                        scripture = monster.scripture,
+                        scriptureRef = monster.scriptureRef,
+                        onBack = { navController.popBackStack() }
+                    )
+                    Button(
+                        onClick = { navController.navigate("combat/${monster.id}") },
+                        modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    ) {
+                        Text("전투 시작")
+                    }
+                }
+            }
+        }
+        composable("combat/{id}") { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id") ?: ""
+            val monster = viewModel.monsters.collectAsState().value.find { it.id == id }
+            if (monster != null) {
+                CombatScreen(
+                    monster = monster,
+                    playerAttack = robotViewModel.totalAttack(),
+                    playerDefense = robotViewModel.totalDefense(),
+                    onExit = { navController.popBackStack("list", inclusive = false) }
                 )
             }
         }
