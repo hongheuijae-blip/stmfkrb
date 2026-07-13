@@ -12,7 +12,7 @@ admin.initializeApp({
 const db = admin.firestore();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 const PROMPT = `너는 스팀펑크 세계관의 게임 디자이너이자 데이터 엔지니어야.
 다음 형식의 JSON만 출력해줘. 다른 텍스트나 마크다운 코드블록 표시는 절대 출력하지 마.
