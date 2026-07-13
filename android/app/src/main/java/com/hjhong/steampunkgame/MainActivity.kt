@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -28,13 +27,14 @@ class MainActivity : ComponentActivity() {
     private val weaponViewModel: WeaponViewModel by viewModels()
     private val cityViewModel: CityViewModel by viewModels()
     private val questViewModel: QuestViewModel by viewModels()
+    private val robotViewModel: RobotViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
                 var selectedTab by remember { mutableStateOf(0) }
-                val tabs = listOf("몬스터", "무기", "도시", "퀘스트")
+                val tabs = listOf("몬스터", "무기", "도시", "퀘스트", "로봇")
 
                 Column(modifier = Modifier.fillMaxSize()) {
                     TabRow(selectedTabIndex = selectedTab) {
@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
                             1 -> WeaponScreen(weaponViewModel)
                             2 -> CityScreen(cityViewModel)
                             3 -> QuestScreen(questViewModel)
+                            4 -> RobotScreen(robotViewModel)
                         }
                     }
                 }
@@ -217,6 +218,87 @@ fun QuestScreen(viewModel: QuestViewModel) {
                     onBack = { navController.popBackStack() }
                 )
             }
+        }
+    }
+}
+
+// ───────────── 로봇 개조/장착 ─────────────
+
+@Composable
+fun RobotScreen(viewModel: RobotViewModel) {
+    val parts by viewModel.parts.collectAsState()
+    val equipped by viewModel.equipped.collectAsState()
+    val error by viewModel.error.collectAsState()
+
+    if (error != null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("에러: $error")
+        }
+        return
+    }
+
+    if (parts.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("로봇 파츠 데이터 없음")
+        }
+        return
+    }
+
+    val slots = parts.map { it.slot }.distinct()
+
+    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        item {
+            Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("현재 로봇 스탯", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(8.dp))
+                    Text("총 공격력 보너스: +${viewModel.totalAttack()}")
+                    Text("총 방어력 보너스: +${viewModel.totalDefense()}")
+                }
+            }
+        }
+
+        slots.forEach { slot ->
+            item {
+                Text(
+                    "슬롯: $slot",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            val slotParts = parts.filter { it.slot == slot }
+            items(slotParts) { part ->
+                val isEquipped = equipped[slot] == part.id
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (isEquipped) viewModel.unequip(slot) else viewModel.equip(slot, part.id)
+                        }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (part.imagePath.isNotBlank()) {
+                        AsyncImage(
+                            model = part.imagePath,
+                            contentDescription = part.name,
+                            modifier = Modifier.size(56.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(part.name, style = MaterialTheme.typography.bodyLarge)
+                        Text("ATK +${part.bonusAttack}  DEF +${part.bonusDefense}")
+                        if (part.specialEffect.isNotBlank()) {
+                            Text(part.specialEffect, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    if (isEquipped) {
+                        Text("장착중", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }
         }
     }
 }
