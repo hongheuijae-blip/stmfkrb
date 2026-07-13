@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const Anthropic = require("@anthropic-ai/sdk");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fetch = require("node-fetch");
 const fs = require("fs");
 const path = require("path");
@@ -10,10 +10,12 @@ admin.initializeApp({
   credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
 });
 const db = admin.firestore();
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 const PROMPT = `너는 스팀펑크 세계관의 게임 디자이너이자 데이터 엔지니어야.
-다음 형식의 JSON만 출력해줘. 다른 텍스트는 절대 출력하지 마.
+다음 형식의 JSON만 출력해줘. 다른 텍스트나 마크다운 코드블록 표시는 절대 출력하지 마.
 {
   "monsters": [{"name":"", "level":1, "hp":1, "attack":1, "defense":1, "element":"", "lore":""}],
   "weapons": [{"name":"", "type":"", "attack":1, "rarity":"", "description":""}],
@@ -31,13 +33,12 @@ async function downloadImage(url, tmpPath) {
 }
 
 async function main() {
-  const msg = await anthropic.messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 4000,
-    messages: [{ role: "user", content: PROMPT }],
-  });
+  const result = await model.generateContent(PROMPT);
+  let raw = result.response.text().trim();
 
-  const raw = msg.content[0].text.trim();
+  // Gemini가 가끔 ```json ... ``` 코드블록으로 감싸서 줄 수 있어서 제거
+  raw = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+
   const gameData = JSON.parse(raw);
 
   if (!validateGameDataJson(gameData)) {
