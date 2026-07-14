@@ -8,6 +8,9 @@ const firebaseConfig = {
   appId: "1:938837590440:web:5b972203cd9118b4885d9d"
 };
 
+// Kotlin에서 주입해주는 전역 변수. 없으면 null.
+window.INJECTED_PLAYER_IMAGE_URL = window.INJECTED_PLAYER_IMAGE_URL || null;
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
@@ -53,9 +56,8 @@ class OverworldScene extends Phaser.Scene {
     ]);
 
     this.monsterData = monstersSnap.docs.map(d => d.data());
-    const parts = partsSnap.docs.map(d => d.data());
-    const bodyPart = parts.find(p => (p.slot || "").toLowerCase().includes("body")) || parts[0];
-    this.playerImageUrl = bodyPart ? bodyPart.imagePath : null;
+    // Kotlin에서 실제 "장착된" 파츠 이미지를 주입받아 우선 사용
+    this.playerImageUrl = window.INJECTED_PLAYER_IMAGE_URL || null;
 
     // 플레이어 이미지 로드 (있으면), 로드 후 스프라이트 생성
     const startPlayer = () => {

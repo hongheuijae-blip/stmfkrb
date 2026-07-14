@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
                     composable("game") {
                         Box(modifier = Modifier.fillMaxSize()) {
                             PhaserOverworldScreen(
+                                playerImagePath = robotViewModel.representativeImagePath(),
                                 onEncounter = { monsterId ->
                                     if (monsterId.isNotBlank()) {
                                         navController.navigate("combat/$monsterId")
@@ -478,7 +479,7 @@ fun RobotScreen(viewModel: RobotViewModel) {
 }
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun PhaserOverworldScreen(onEncounter: (String) -> Unit) {
+fun PhaserOverworldScreen(playerImagePath: String?, onEncounter: (String) -> Unit) {
     AndroidView(
         factory = { context ->
             WebView(context).apply {
@@ -493,6 +494,17 @@ fun PhaserOverworldScreen(onEncounter: (String) -> Unit) {
                     },
                     "AndroidBridge"
                 )
+                webViewClient = object : android.webkit.WebViewClient() {
+                    override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                        val safeUrl = playerImagePath?.replace("'", "\\'") ?: ""
+                        val js = if (playerImagePath.isNullOrBlank()) {
+                            "window.INJECTED_PLAYER_IMAGE_URL = null;"
+                        } else {
+                            "window.INJECTED_PLAYER_IMAGE_URL = '$safeUrl';"
+                        }
+                        view?.evaluateJavascript(js, null)
+                    }
+                }
                 loadUrl("file:///android_asset/game/index.html")
             }
         },
