@@ -20,7 +20,7 @@ android {
         compose = true
     }
 
-    // 🔥 GitHub Actions에서 실제로 존재하는 최신 안정 Compose Compiler
+    // 🔥 Compose Compiler ↔ Kotlin 1.9.25 완전 호환 버전
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.15"
     }
@@ -37,8 +37,8 @@ android {
 
 dependencies {
 
-    // 🔥 최신 Compose BOM (2024.10.00)
-    implementation(platform("androidx.compose:compose-bom:2024.10.00"))
+    // 🔥 최신 Compose BOM (gesture API 포함)
+    implementation(platform("androidx.compose:compose-bom:2025.02.00"))
 
     // Compose UI
     implementation("androidx.compose.ui:ui")
@@ -48,7 +48,7 @@ dependencies {
     // Material3 최신
     implementation("androidx.compose.material3:material3")
 
-    // Compose Foundation (gesture 포함)
+    // Compose Foundation (awaitEachGesture / drag 포함)
     implementation("androidx.compose.foundation:foundation")
 
     // Activity Compose
