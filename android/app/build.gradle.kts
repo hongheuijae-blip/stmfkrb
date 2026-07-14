@@ -20,9 +20,9 @@ android {
         compose = true
     }
 
-    // 🔥 최신 Compose Compiler Extension (2026년 기준 안정)
+    // 🔥 GitHub Actions에서 실제로 존재하는 최신 안정 Compose Compiler
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.7.0"
+        kotlinCompilerExtensionVersion = "1.5.15"
     }
 
     compileOptions {
@@ -37,7 +37,7 @@ android {
 
 dependencies {
 
-    // 🔥 최신 Compose BOM (2024.10.00 안정 버전)
+    // 🔥 최신 Compose BOM (2024.10.00)
     implementation(platform("androidx.compose:compose-bom:2024.10.00"))
 
     // Compose UI
