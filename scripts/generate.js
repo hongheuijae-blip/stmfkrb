@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const { validateGameDataJson } = require("./schemaValidator");
 const { getDriveClient, uploadOrReplace } = require("./uploadToDrive");
+const Jimp = require("jimp");
 
 admin.initializeApp({
   credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
@@ -62,6 +63,39 @@ async function downloadImage(url, tmpPath) {
   fs.writeFileSync(tmpPath, buffer);
 }
 
+// 흰 배경을 투명하게 변환 (모서리 색상을 배경색으로 간주해 키잉)
+async function makeBackgroundTransparent(filePath) {
+  const image = await Jimp.read(filePath);
+  const w = image.bitmap.width;
+  const h = image.bitmap.height;
+
+  // 네 모서리 픽셀 평균으로 배경색 추정
+  const corners = [
+    image.getPixelColor(2, 2),
+    image.getPixelColor(w - 3, 2),
+    image.getPixelColor(2, h - 3),
+    image.getPixelColor(w - 3, h - 3),
+  ];
+  const rgbaList = corners.map((c) => Jimp.intToRGBA(c));
+  const bgR = rgbaList.reduce((s, c) => s + c.r, 0) / 4;
+  const bgG = rgbaList.reduce((s, c) => s + c.g, 0) / 4;
+  const bgB = rgbaList.reduce((s, c) => s + c.b, 0) / 4;
+
+  const threshold = 40; // 배경색과의 색상 거리 허용치
+
+  image.scan(0, 0, w, h, function (x, y, idx) {
+    const r = this.bitmap.data[idx + 0];
+    const g = this.bitmap.data[idx + 1];
+    const b = this.bitmap.data[idx + 2];
+    const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
+    if (dist < threshold) {
+      this.bitmap.data[idx + 3] = 0; // 알파값 0 = 투명
+    }
+  });
+
+  await image.writeAsync(filePath);
+}
+
 // 항목마다 완전히 다른 이미지가 나오도록 랜덤 seed + 상세 정보를 프롬프트에 포함
 function buildImageUrl(col, item) {
   let detail = "";
@@ -80,7 +114,10 @@ function buildImageUrl(col, item) {
       break;
   }
 
-  const prompt = `steampunk style ${col} concept art, ${item.name}, ${detail}, gears and steam, detailed illustration, unique design, distinct silhouette`;
+  // 게임 스프라이트용: 단색 흰 배경 + 중앙 정렬 아이콘 스타일로 통일
+  const prompt = `steampunk game icon, ${col} concept, ${item.name}, ${detail}, ` +
+    `centered single subject, plain solid white background, no shadow, ` +
+    `flat icon illustration style, clean silhouette, no text, no watermark`;
   const seed = Math.floor(Math.random() * 1000000);
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=768&nologo=true&seed=${seed}`;
 }
@@ -107,6 +144,7 @@ async function main() {
 
       const tmpPath = path.join("/tmp", `${col}-${item.name}.png`.replace(/\s/g, "_"));
       await downloadImage(imgUrl, tmpPath);
+      await makeBackgroundTransparent(tmpPath);
 
       const fileId = await uploadOrReplace(
         drive,
@@ -115,6 +153,7 @@ async function main() {
         path.basename(tmpPath),
         "image/png"
       );
+
       item.imagePath = `https://drive.google.com/uc?export=view&id=${fileId}`;
       fs.unlinkSync(tmpPath);
     }
