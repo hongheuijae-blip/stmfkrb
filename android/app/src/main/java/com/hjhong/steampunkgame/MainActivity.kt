@@ -23,6 +23,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
+import android.annotation.SuppressLint
+import android.os.Handler
+import android.os.Looper
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import androidx.compose.ui.viewinterop.AndroidView
 
 class MainActivity : ComponentActivity() {
     private val monsterViewModel: MonsterViewModel by viewModels()
@@ -41,26 +47,17 @@ class MainActivity : ComponentActivity() {
 
                     // ───── 메인 게임 화면 (오버월드, 전체 화면) ─────
                     composable("game") {
-                        val monsters by monsterViewModel.monsters.collectAsState()
                         Box(modifier = Modifier.fillMaxSize()) {
-                            if (monsters.isEmpty()) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("몬스터 데이터가 없어 탐험할 수 없습니다.\n먼저 데이터를 생성해주세요.")
+                            PhaserOverworldScreen(
+                                onEncounter = { monsterId ->
+                                    if (monsterId.isNotBlank()) {
+                                        navController.navigate("combat/$monsterId")
+                                    }
                                 }
-                            } else {
-                                OverworldScreen(
-                                  monsters = monsters,
-                                  playerImagePath = robotViewModel.representativeImagePath(),
-                                  onEncounter = { monster -> navController.navigate("combat/${monster.id}") }
-                                               )
-                                
-                            }
-
+                            )
                             IconButton(
                                 onClick = { navController.navigate("menu") },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(12.dp)
+                                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
                             ) {
                                 Icon(Icons.Default.Menu, contentDescription = "메뉴")
                             }
@@ -478,4 +475,27 @@ fun RobotScreen(viewModel: RobotViewModel) {
             item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }
         }
     }
+}
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun PhaserOverworldScreen(onEncounter: (String) -> Unit) {
+    AndroidView(
+        factory = { context ->
+            WebView(context).apply {
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                addJavascriptInterface(
+                    object {
+                        @JavascriptInterface
+                        fun onEncounter(monsterId: String) {
+                            Handler(Looper.getMainLooper()).post { onEncounter(monsterId) }
+                        }
+                    },
+                    "AndroidBridge"
+                )
+                loadUrl("file:///android_asset/game/index.html")
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
 }
