@@ -8,6 +8,7 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class RobotViewModel(application: Application) : AndroidViewModel(application) {
@@ -20,7 +21,6 @@ class RobotViewModel(application: Application) : AndroidViewModel(application) {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    // 슬롯 이름 -> 장착된 파츠 id
     private val _equipped = MutableStateFlow<Map<String, String>>(emptyMap())
     val equipped: StateFlow<Map<String, String>> = _equipped.asStateFlow()
 
@@ -29,21 +29,29 @@ class RobotViewModel(application: Application) : AndroidViewModel(application) {
             .get()
             .addOnSuccessListener { snap ->
                 _parts.value = snap.toObjects(RobotPart::class.java)
-                loadEquippedForAllSlots()
+                observeAllSlots()
             }
             .addOnFailureListener { e -> _error.value = e.message }
     }
 
-    private fun loadEquippedForAllSlots() {
+    private fun observeAllSlots() {
         val slots = _parts.value.map { it.slot }.distinct()
+        if (slots.isEmpty()) return
+
+        val flows = slots.map { slot ->
+            loadoutManager.equippedPartIdFlow(slot)
+        }
+
         viewModelScope.launch {
-            val result = mutableMapOf<String, String>()
-            slots.forEach { slot ->
-                loadoutManager.equippedPartIdFlow(slot).collect { partId ->
-                    if (partId != null) result[slot] = partId
-                    _equipped.value = result.toMap()
-                    return@collect
+            combine(flows) { values ->
+                val map = mutableMapOf<String, String>()
+                slots.forEachIndexed { index, slot ->
+                    val partId = values[index]
+                    if (partId != null) map[slot] = partId
                 }
+                map.toMap()
+            }.collect { map ->
+                _equipped.value = map
             }
         }
     }
@@ -51,19 +59,18 @@ class RobotViewModel(application: Application) : AndroidViewModel(application) {
     fun equip(slot: String, partId: String) {
         viewModelScope.launch {
             loadoutManager.equip(slot, partId)
-            _equipped.value = _equipped.value.toMutableMap().apply { put(slot, partId) }
         }
     }
 
     fun unequip(slot: String) {
         viewModelScope.launch {
             loadoutManager.unequip(slot)
-            _equipped.value = _equipped.value.toMutableMap().apply { remove(slot) }
         }
     }
 
     fun totalAttack(): Int = equippedParts().sumOf { it.bonusAttack }
     fun totalDefense(): Int = equippedParts().sumOf { it.bonusDefense }
+
     fun representativeImagePath(): String? {
         val eq = equippedParts()
         val bodyPart = eq.find { it.slot.contains("body", true) || it.slot.contains("몸통") }
