@@ -49,9 +49,11 @@ class MainActivity : ComponentActivity() {
                                 }
                             } else {
                                 OverworldScreen(
-                                    monsters = monsters,
-                                    onEncounter = { monster -> navController.navigate("combat/${monster.id}") }
-                                )
+                                  monsters = monsters,
+                                  playerImagePath = robotViewModel.representativeImagePath(),
+                                  onEncounter = { monster -> navController.navigate("combat/${monster.id}") }
+                                               )
+                                
                             }
 
                             IconButton(
@@ -117,11 +119,12 @@ class MainActivity : ComponentActivity() {
                         val monster = monsterViewModel.monsters.collectAsState().value.find { it.id == id }
                         if (monster != null) {
                             CombatScreen(
-                                monster = monster,
-                                playerAttack = robotViewModel.totalAttack(),
-                                playerDefense = robotViewModel.totalDefense(),
-                                onExit = { navController.popBackStack("game", inclusive = false) }
-                            )
+                                     monster = monster,
+                                     playerAttack = robotViewModel.totalAttack(),
+                                     playerDefense = robotViewModel.totalDefense(),
+                                     playerImagePath = robotViewModel.representativeImagePath(),
+                                     onExit = { navController.popBackStack("game", inclusive = false) }
+                                         )                                         
                         }
                     }
 

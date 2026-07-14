@@ -18,11 +18,14 @@ private const val MAP_H = 600f
 private const val TRAILER_RADIUS = 24f
 private const val MAP_SPEED = 5f
 private const val ENCOUNTER_DISTANCE_THRESHOLD = 350f
-private const val ENCOUNTER_CHANCE = 0.4f // 임계 거리 도달 시 조우할 확률
+private const val ENCOUNTER_CHANCE = 0.4f
+
+private val TRAILER_ICON_SIZE = 56.dp
 
 @Composable
 fun OverworldScreen(
     monsters: List<Monster>,
+    playerImagePath: String?,
     onEncounter: (Monster) -> Unit
 ) {
     var trailerPos by remember { mutableStateOf(Offset(MAP_W / 2f, MAP_H / 2f)) }
@@ -63,25 +66,24 @@ fun OverworldScreen(
                 modifier = Modifier.padding(16.dp)
             )
 
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .background(Color(0xFF2E3B2E))
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val scaleX = size.width / MAP_W
-                    val scaleY = size.height / MAP_H
+                val scaleX = maxWidth.value / MAP_W
+                val scaleY = maxHeight.value / MAP_H
 
-                    // 간단한 격자 배경으로 이동감 표현
+                Canvas(modifier = Modifier.fillMaxSize()) {
                     val gridSize = 60f
                     var gx = 0f
                     while (gx < MAP_W) {
                         drawLine(
                             color = Color.White.copy(alpha = 0.06f),
-                            start = Offset(gx * scaleX, 0f),
-                            end = Offset(gx * scaleX, size.height)
+                            start = Offset(gx * (size.width / MAP_W), 0f),
+                            end = Offset(gx * (size.width / MAP_W), size.height)
                         )
                         gx += gridSize
                     }
@@ -89,32 +91,31 @@ fun OverworldScreen(
                     while (gy < MAP_H) {
                         drawLine(
                             color = Color.White.copy(alpha = 0.06f),
-                            start = Offset(0f, gy * scaleY),
-                            end = Offset(size.width, gy * scaleY)
+                            start = Offset(0f, gy * (size.height / MAP_H)),
+                            end = Offset(size.width, gy * (size.height / MAP_H))
                         )
                         gy += gridSize
                     }
-
-                    // 트레일러
-                    drawCircle(
-                        color = Color(0xFFFFC107),
-                        radius = TRAILER_RADIUS * scaleX,
-                        center = Offset(trailerPos.x * scaleX, trailerPos.y * scaleY)
-                    )
                 }
+
+                GameEntity(
+                    imagePath = playerImagePath,
+                    fallbackColor = Color(0xFFFFC107),
+                    size = TRAILER_ICON_SIZE,
+                    xDp = trailerPos.x * scaleX,
+                    yDp = trailerPos.y * scaleY
+                )
             }
 
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
+                modifier = Modifier.fillMaxWidth().padding(24.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
                 Joystick(onDirectionChange = { joystickVector = it })
             }
         }
 
-        if (encounterMonster != null && monsters.isEmpty().not()) {
+        if (encounterMonster != null) {
             val monster = encounterMonster!!
             AlertDialog(
                 onDismissRequest = {},

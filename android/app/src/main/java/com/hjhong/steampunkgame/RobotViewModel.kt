@@ -64,6 +64,11 @@ class RobotViewModel(application: Application) : AndroidViewModel(application) {
 
     fun totalAttack(): Int = equippedParts().sumOf { it.bonusAttack }
     fun totalDefense(): Int = equippedParts().sumOf { it.bonusDefense }
+    fun representativeImagePath(): String? {
+        val eq = equippedParts()
+        val bodyPart = eq.find { it.slot.contains("body", true) || it.slot.contains("몸통") }
+        return (bodyPart ?: eq.firstOrNull { it.imagePath.isNotBlank() })?.imagePath?.takeIf { it.isNotBlank() }
+    }
 
     private fun equippedParts(): List<RobotPart> {
         val equippedIds = _equipped.value.values.toSet()
