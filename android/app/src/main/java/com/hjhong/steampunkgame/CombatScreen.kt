@@ -2,7 +2,6 @@ package com.hjhong.steampunkgame
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
@@ -15,8 +14,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+
+// 🔥 최신 Compose Pointer Input API
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.awaitEachGesture
+import androidx.compose.ui.input.pointer.awaitFirstDown
+import androidx.compose.ui.input.pointer.drag
+import androidx.compose.ui.input.pointer.positionChange
+
+// 🔧 수학 함수
 import kotlin.math.*
+
 
 private const val ARENA_W = 800f
 private const val ARENA_H = 500f
@@ -221,23 +229,34 @@ fun Joystick(onDirectionChange: (Offset) -> Unit) {
             .clip(CircleShape)
             .background(Color.White.copy(alpha = 0.15f))
             .pointerInput(Unit) {
-                detectDragGestures(
-                    onDrag = { change, dragAmount ->
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+
+                    drag(down.id) { change ->
                         change.consume()
+
+                        val dragAmount = change.positionChange()
                         val newOffset = knobOffset + dragAmount
                         val dist = newOffset.getDistance()
+
                         knobOffset = if (dist > maxRadius) {
                             newOffset * (maxRadius / dist)
                         } else {
                             newOffset
                         }
-                        onDirectionChange(Offset(knobOffset.x / maxRadius, knobOffset.y / maxRadius))
-                    },
-                    onDragEnd = {
-                        knobOffset = Offset.Zero
-                        onDirectionChange(Offset.Zero)
+
+                        onDirectionChange(
+                            Offset(
+                                knobOffset.x / maxRadius,
+                                knobOffset.y / maxRadius
+                            )
+                        )
                     }
-                )
+
+                    // 손을 떼면 원위치
+                    knobOffset = Offset.Zero
+                    onDirectionChange(Offset.Zero)
+                }
             },
         contentAlignment = Alignment.Center
     ) {
