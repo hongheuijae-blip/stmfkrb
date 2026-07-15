@@ -119,23 +119,34 @@ fun CombatScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
 
+        if (boardingPhase == BoardingPhase.PLAYING) {
+            HudCornerFrame()
+        }
+
         // 실제 전투 UI (기동 완료 후에만 조작 가능, 하지만 READY 단계부터 미리 그려서 자연스럽게 겹침)
         if (boardingPhase != BoardingPhase.BOARDING) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            (modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(monster.name, style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Text("몬스터 HP: $monsterHp / ${monster.hp}")
-                    LinearProgressIndicator(
-                        progress = { (monsterHp.toFloat() / monster.hp).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().height(8.dp)
+                    Text(
+                        "TARGET LOCK · ${monster.name}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFFE53935),
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Text("로봇 장갑: $playerHp / $basePlayerHp")
-                    LinearProgressIndicator(
-                        progress = { (playerHp.toFloat() / basePlayerHp).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().height(8.dp),
-                        color = Color(0xFF2196F3)
+                    Spacer(Modifier.height(6.dp))
+                    HudGaugeBar(
+                        label = "적 장갑",
+                        current = monsterHp,
+                        max = monster.hp,
+                        barColor = Color(0xFFE53935)
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    HudGaugeBar(
+                        label = "로봇 장갑",
+                        current = playerHp,
+                        max = basePlayerHp,
+                        barColor = Color(0xFFFFC107)
                     )
                 }
 
@@ -376,5 +387,72 @@ fun Joystick(onDirectionChange: (Offset) -> Unit) {
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.6f))
         )
+    }
+}
+
+@Composable
+fun HudGaugeBar(label: String, current: Int, max: Int, barColor: Color) {
+    val ratio = (current.toFloat() / max.coerceAtLeast(1)).coerceIn(0f, 1f)
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                label.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+            Text(
+                "$current / $max",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+        }
+        Spacer(Modifier.height(3.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .background(Color.Black.copy(alpha = 0.6f))
+                .padding(1.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(ratio)
+                    .background(barColor)
+            )
+        }
+    }
+}
+
+@Composable
+fun HudCornerFrame() {
+    val bracketColor = Color(0xFFFFC107).copy(alpha = 0.5f)
+    val bracketSize = 28.dp
+    val thickness = 3.dp
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 좌상단
+        Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp)) {
+            Box(Modifier.size(bracketSize, thickness).background(bracketColor))
+            Box(Modifier.size(thickness, bracketSize).background(bracketColor))
+        }
+        // 우상단
+        Box(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)) {
+            Box(Modifier.align(Alignment.TopEnd).size(bracketSize, thickness).background(bracketColor))
+            Box(Modifier.align(Alignment.TopEnd).size(thickness, bracketSize).background(bracketColor))
+        }
+        // 좌하단
+        Box(modifier = Modifier.align(Alignment.BottomStart).padding(6.dp)) {
+            Box(Modifier.align(Alignment.BottomStart).size(bracketSize, thickness).background(bracketColor))
+            Box(Modifier.align(Alignment.BottomStart).size(thickness, bracketSize).background(bracketColor))
+        }
+        // 우하단
+        Box(modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp)) {
+            Box(Modifier.align(Alignment.BottomEnd).size(bracketSize, thickness).background(bracketColor))
+            Box(Modifier.align(Alignment.BottomEnd).size(thickness, bracketSize).background(bracketColor))
+        }
     }
 }
