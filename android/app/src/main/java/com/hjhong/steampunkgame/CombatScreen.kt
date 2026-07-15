@@ -1,5 +1,8 @@
 package com.hjhong.steampunkgame
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -14,6 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
@@ -29,6 +33,9 @@ private const val ATTACK_RANGE = PLAYER_RADIUS + MONSTER_RADIUS + 10f
 private val PLAYER_ICON_SIZE = 56.dp
 private val MONSTER_ICON_SIZE = 64.dp
 
+// 탑승 시퀀스 단계
+private enum class BoardingPhase { BOARDING, READY, PLAYING }
+
 @Composable
 fun CombatScreen(
     monster: Monster,
@@ -37,6 +44,21 @@ fun CombatScreen(
     playerImagePath: String?,
     onExit: () -> Unit
 ) {
+    var boardingPhase by remember { mutableStateOf(BoardingPhase.BOARDING) }
+    var boardingProgress by remember { mutableStateOf(0f) }
+
+    // 기동 시퀀스: 약 1.6초에 걸쳐 게이지가 차오르고, "전투 개시" 표시 후 조작 풀림
+    LaunchedEffect(Unit) {
+        val steps = 32
+        repeat(steps) { i ->
+            boardingProgress = (i + 1) / steps.toFloat()
+            delay(35)
+        }
+        boardingPhase = BoardingPhase.READY
+        delay(500)
+        boardingPhase = BoardingPhase.PLAYING
+    }
+
     var playerPos by remember { mutableStateOf(Offset(150f, ARENA_H / 2f)) }
     var monsterPos by remember { mutableStateOf(Offset(ARENA_W - 150f, ARENA_H / 2f)) }
     var joystickVector by remember { mutableStateOf(Offset.Zero) }
@@ -50,7 +72,8 @@ fun CombatScreen(
 
     var result by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(result) {
+    LaunchedEffect(result, boardingPhase) {
+        if (boardingPhase != BoardingPhase.PLAYING) return@LaunchedEffect
         var tickCount = 0
         while (result == null) {
             delay(16)
@@ -86,109 +109,119 @@ fun CombatScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(monster.name, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(4.dp))
-                Text("몬스터 HP: $monsterHp / ${monster.hp}")
-                LinearProgressIndicator(
-                    progress = { (monsterHp.toFloat() / monster.hp).coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth().height(8.dp)
-                )
-                Spacer(Modifier.height(8.dp))
-                Text("내 로봇 HP: $playerHp / $basePlayerHp")
-                LinearProgressIndicator(
-                    progress = { (playerHp.toFloat() / basePlayerHp).coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth().height(8.dp),
-                    color = Color(0xFF2196F3)
-                )
-            }
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A0A))) {
 
-            BoxWithConstraints(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .background(Color(0xFF1B1B1B))
-            ) {
-                val areaWidthPx = maxWidth.value
-                val areaHeightPx = maxHeight.value
-                val scaleX = areaWidthPx / ARENA_W
-                val scaleY = areaHeightPx / ARENA_H
-
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    // 사거리 표시만 Canvas에 남김
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.15f),
-                        radius = ATTACK_RANGE * (size.width / ARENA_W),
-                        center = Offset(playerPos.x * (size.width / ARENA_W), playerPos.y * (size.height / ARENA_H)),
-                        style = Stroke(width = 2f)
+        // 실제 전투 UI (기동 완료 후에만 조작 가능, 하지만 READY 단계부터 미리 그려서 자연스럽게 겹침)
+        if (boardingPhase != BoardingPhase.BOARDING) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(monster.name, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text("몬스터 HP: $monsterHp / ${monster.hp}")
+                    LinearProgressIndicator(
+                        progress = { (monsterHp.toFloat() / monster.hp).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().height(8.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("로봇 장갑: $playerHp / $basePlayerHp")
+                    LinearProgressIndicator(
+                        progress = { (playerHp.toFloat() / basePlayerHp).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().height(8.dp),
+                        color = Color(0xFF2196F3)
                     )
                 }
 
-                // 플레이어 (로봇 파츠 이미지 또는 fallback 원)
-                GameEntity(
-                    imagePath = playerImagePath,
-                    fallbackColor = Color(0xFF2196F3),
-                    size = PLAYER_ICON_SIZE,
-                    xDp = playerPos.x * scaleX,
-                    yDp = playerPos.y * scaleY
-                )
-
-                // 몬스터
-                GameEntity(
-                    imagePath = monster.imagePath,
-                    fallbackColor = Color(0xFFE53935),
-                    size = MONSTER_ICON_SIZE,
-                    xDp = monsterPos.x * scaleX,
-                    yDp = monsterPos.y * scaleY
-                )
-
-                floatingTexts.forEach { ft ->
-                    val elapsed = System.currentTimeMillis() - ft.createdAt
-                    val alpha = (1f - elapsed / 800f).coerceIn(0f, 1f)
-                    val yOffset = -(elapsed / 800f) * 40f
-                    Text(
-                        ft.text,
-                        color = ft.color.copy(alpha = alpha),
-                        modifier = Modifier.offset(
-                            x = (ft.pos.x * scaleX).dp,
-                            y = (ft.pos.y * scaleY + yOffset).dp
-                        ),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Joystick(onDirectionChange = { joystickVector = it })
-
-                Button(
-                    onClick = {
-                        if (!attackCooldown && result == null) {
-                            val dx = playerPos.x - monsterPos.x
-                            val dy = playerPos.y - monsterPos.y
-                            val dist = sqrt(dx * dx + dy * dy)
-                            if (dist <= ATTACK_RANGE) {
-                                val dmg = max(1, playerAttack - monster.defense / 2)
-                                monsterHp = (monsterHp - dmg).coerceAtLeast(0)
-                                floatingTexts = floatingTexts + FloatingText("-$dmg", monsterPos, System.currentTimeMillis(), Color.Yellow)
-                                if (monsterHp <= 0) result = "win"
-                            }
-                        }
-                    },
-                    modifier = Modifier.size(80.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .background(Color(0xFF1B1B1B))
                 ) {
-                    Text("공격", color = Color.White)
+                    val scaleX = maxWidth.value / ARENA_W
+                    val scaleY = maxHeight.value / ARENA_H
+
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.15f),
+                            radius = ATTACK_RANGE * (size.width / ARENA_W),
+                            center = Offset(playerPos.x * (size.width / ARENA_W), playerPos.y * (size.height / ARENA_H)),
+                            style = Stroke(width = 2f)
+                        )
+                    }
+
+                    GameEntity(
+                        imagePath = playerImagePath,
+                        fallbackColor = Color(0xFF2196F3),
+                        size = PLAYER_ICON_SIZE,
+                        xDp = playerPos.x * scaleX,
+                        yDp = playerPos.y * scaleY
+                    )
+
+                    GameEntity(
+                        imagePath = monster.imagePath,
+                        fallbackColor = Color(0xFFE53935),
+                        size = MONSTER_ICON_SIZE,
+                        xDp = monsterPos.x * scaleX,
+                        yDp = monsterPos.y * scaleY
+                    )
+
+                    floatingTexts.forEach { ft ->
+                        val elapsed = System.currentTimeMillis() - ft.createdAt
+                        val alpha = (1f - elapsed / 800f).coerceIn(0f, 1f)
+                        val yOffset = -(elapsed / 800f) * 40f
+                        Text(
+                            ft.text,
+                            color = ft.color.copy(alpha = alpha),
+                            modifier = Modifier.offset(
+                                x = (ft.pos.x * scaleX).dp,
+                                y = (ft.pos.y * scaleY + yOffset).dp
+                            ),
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Joystick(onDirectionChange = { v ->
+                        if (boardingPhase == BoardingPhase.PLAYING) joystickVector = v
+                    })
+
+                    Button(
+                        onClick = {
+                            if (boardingPhase == BoardingPhase.PLAYING && !attackCooldown && result == null) {
+                                val dx = playerPos.x - monsterPos.x
+                                val dy = playerPos.y - monsterPos.y
+                                val dist = sqrt(dx * dx + dy * dy)
+                                if (dist <= ATTACK_RANGE) {
+                                    val dmg = max(1, playerAttack - monster.defense / 2)
+                                    monsterHp = (monsterHp - dmg).coerceAtLeast(0)
+                                    floatingTexts = floatingTexts + FloatingText("-$dmg", monsterPos, System.currentTimeMillis(), Color.Yellow)
+                                    if (monsterHp <= 0) result = "win"
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(80.dp),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
+                    ) {
+                        Text("공격", color = Color.White)
+                    }
                 }
             }
+        }
+
+        // 탑승 연출 오버레이 (BOARDING/READY 단계에서만 표시, 위에 겹쳐짐)
+        if (boardingPhase != BoardingPhase.PLAYING) {
+            BoardingOverlay(
+                phase = boardingPhase,
+                progress = boardingProgress,
+                playerImagePath = playerImagePath
+            )
         }
 
         if (result != null) {
@@ -202,6 +235,69 @@ fun CombatScreen(
                     )
                 },
                 confirmButton = { TextButton(onClick = onExit) { Text("돌아가기") } }
+            )
+        }
+    }
+}
+
+@Composable
+private fun BoardingOverlay(
+    phase: BoardingPhase,
+    progress: Float,
+    playerImagePath: String?
+) {
+    val slideOffset by animateFloatAsState(
+        targetValue = if (phase == BoardingPhase.READY) 0f else 300f,
+        animationSpec = tween(durationMillis = 500, easing = LinearEasing),
+        label = "slide"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.92f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+            Box(
+                modifier = Modifier
+                    .offset(y = slideOffset.dp)
+                    .size(120.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!playerImagePath.isNullOrBlank()) {
+                    AsyncImage(
+                        model = playerImagePath,
+                        contentDescription = null,
+                        modifier = Modifier.size(100.dp)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2196F3))
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                if (phase == BoardingPhase.READY) "전투 개시!" else "로봇 기동 중...",
+                color = Color(0xFFFFC107),
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.width(220.dp).height(6.dp),
+                color = Color(0xFFFFC107),
+                trackColor = Color.White.copy(alpha = 0.15f)
             )
         }
     }
