@@ -62,6 +62,7 @@ fun CombatScreen(
     var playerPos by remember { mutableStateOf(Offset(150f, ARENA_H / 2f)) }
     var monsterPos by remember { mutableStateOf(Offset(ARENA_W - 150f, ARENA_H / 2f)) }
     var joystickVector by remember { mutableStateOf(Offset.Zero) }
+    var playerVelocity by remember { mutableStateOf(Offset.Zero) } // 현재 실제 속도 (관성 적용됨)
 
     val basePlayerHp = 100 + playerDefense * 2
     var playerHp by remember { mutableStateOf(basePlayerHp) }
@@ -79,9 +80,16 @@ fun CombatScreen(
             delay(16)
             tickCount++
 
-            if (joystickVector.getDistance() > 0.1f) {
-                val newX = (playerPos.x + joystickVector.x * MOVE_SPEED).coerceIn(PLAYER_RADIUS, ARENA_W - PLAYER_RADIUS)
-                val newY = (playerPos.y + joystickVector.y * MOVE_SPEED).coerceIn(PLAYER_RADIUS, ARENA_H - PLAYER_RADIUS)
+            // 관성 이동: 목표 속도로 서서히 수렴 (로봇 특유의 묵직함)
+            val targetVelocity = joystickVector * MOVE_SPEED
+            val inertiaFactor = 0.15f // 값이 작을수록 더 묵직하고 느리게 반응
+            playerVelocity = Offset(
+                playerVelocity.x + (targetVelocity.x - playerVelocity.x) * inertiaFactor,
+                playerVelocity.y + (targetVelocity.y - playerVelocity.y) * inertiaFactor
+            )
+            if (playerVelocity.getDistance() > 0.05f) {
+                val newX = (playerPos.x + playerVelocity.x).coerceIn(PLAYER_RADIUS, ARENA_W - PLAYER_RADIUS)
+                val newY = (playerPos.y + playerVelocity.y).coerceIn(PLAYER_RADIUS, ARENA_H - PLAYER_RADIUS)
                 playerPos = Offset(newX, newY)
             }
 

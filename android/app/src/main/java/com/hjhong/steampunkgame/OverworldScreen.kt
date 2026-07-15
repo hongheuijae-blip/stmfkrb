@@ -30,6 +30,7 @@ fun OverworldScreen(
 ) {
     var trailerPos by remember { mutableStateOf(Offset(MAP_W / 2f, MAP_H / 2f)) }
     var joystickVector by remember { mutableStateOf(Offset.Zero) }
+    var trailerVelocity by remember { mutableStateOf(Offset.Zero) }
     var traveledSinceLastCheck by remember { mutableStateOf(0f) }
     var encounterMonster by remember { mutableStateOf<Monster?>(null) }
     var isPaused by remember { mutableStateOf(false) }
@@ -38,25 +39,33 @@ fun OverworldScreen(
         while (!isPaused) {
             delay(16)
 
-            if (joystickVector.getDistance() > 0.1f && monsters.isNotEmpty()) {
-                val dx = joystickVector.x * MAP_SPEED
-                val dy = joystickVector.y * MAP_SPEED
-                val newX = (trailerPos.x + dx).coerceIn(TRAILER_RADIUS, MAP_W - TRAILER_RADIUS)
-                val newY = (trailerPos.y + dy).coerceIn(TRAILER_RADIUS, MAP_H - TRAILER_RADIUS)
-                trailerPos = Offset(newX, newY)
+           if (monsters.isNotEmpty()) {
+                // 트레일러도 관성으로 이동 (트레일러답게 좀 더 미끄러지는 느낌)
+                val targetVelocity = joystickVector * MAP_SPEED
+                val inertiaFactor = 0.1f
+                trailerVelocity = Offset(
+                    trailerVelocity.x + (targetVelocity.x - trailerVelocity.x) * inertiaFactor,
+                    trailerVelocity.y + (targetVelocity.y - trailerVelocity.y) * inertiaFactor
+                )
 
-                traveledSinceLastCheck += kotlin.math.sqrt(dx * dx + dy * dy)
+                if (trailerVelocity.getDistance() > 0.05f) {
+                    val dx = trailerVelocity.x
+                    val dy = trailerVelocity.y
+                    val newX = (trailerPos.x + dx).coerceIn(TRAILER_RADIUS, MAP_W - TRAILER_RADIUS)
+                    val newY = (trailerPos.y + dy).coerceIn(TRAILER_RADIUS, MAP_H - TRAILER_RADIUS)
+                    trailerPos = Offset(newX, newY)
 
-                if (traveledSinceLastCheck >= ENCOUNTER_DISTANCE_THRESHOLD) {
-                    traveledSinceLastCheck = 0f
-                    if (Random.nextFloat() < ENCOUNTER_CHANCE) {
-                        encounterMonster = monsters.random()
-                        isPaused = true
+                    traveledSinceLastCheck += kotlin.math.sqrt(dx * dx + dy * dy)
+
+                    if (traveledSinceLastCheck >= ENCOUNTER_DISTANCE_THRESHOLD) {
+                        traveledSinceLastCheck = 0f
+                        if (Random.nextFloat() < ENCOUNTER_CHANCE) {
+                            encounterMonster = monsters.random()
+                            isPaused = true
+                        }
                     }
                 }
             }
-        }
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
