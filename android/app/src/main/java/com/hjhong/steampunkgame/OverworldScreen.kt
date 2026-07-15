@@ -48,7 +48,7 @@ fun OverworldScreen(
                     val newY = (trailerPos.y + dy).coerceIn(TRAILER_RADIUS, MAP_H - TRAILER_RADIUS)
                     trailerPos = Offset(newX, newY)
                     traveledSinceLastCheck += kotlin.math.sqrt(dx * dx + dy * dy)
-                    if (traveledSinceLastCheck >= ENCOUNTER_DISTANCE_THRESHOLD) {
+                                       if (traveledSinceLastCheck >= ENCOUNTER_DISTANCE_THRESHOLD) {
                         traveledSinceLastCheck = 0f
                         if (Random.nextFloat() < ENCOUNTER_CHANCE) {
                             encounterMonster = monsters.random()
@@ -57,9 +57,10 @@ fun OverworldScreen(
                     }
                 }
             }
-        } // 📌 while (!isPaused) 블록을 닫음
-    } // 📌 LaunchedEffect(isPaused) 블록을 닫음
-    Box(modifier = Modifier.fillMaxSize()) {
+        } // 📌 추가: while (!isPaused) 루프 종료
+    } // 📌 추가: LaunchedEffect(isPaused) 블록 종료
+    
+    Box(modifier = Modifier.fillMaxSize()) { // ⚠️ 이제 정상적인 Composable 영역으로 복귀
         Column(modifier = Modifier.fillMaxSize()) {
             Text(
                 "트레일러로 필드를 이동하세요",
