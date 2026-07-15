@@ -27,7 +27,6 @@ class OverworldScene extends Phaser.Scene {
   }
 
   preload() {
-    // 로딩 대기 텍스처(원)를 즉석에서 그려서 fallback으로 사용
     const g = this.make.graphics({ x: 0, y: 0, add: false });
     g.fillStyle(0xffc107, 1);
     g.fillCircle(28, 28, 28);
@@ -37,14 +36,30 @@ class OverworldScene extends Phaser.Scene {
     g.fillCircle(30, 30, 30);
     g.generateTexture("fallback_monster", 60, 60);
     g.destroy();
+
+    // 한반도 모티브 스팀펑크 가상 지도 배경 (고정 seed로 매번 동일한 지도)
+    const mapPrompt =
+      "top-down fantasy map, stylized Korean peninsula shape, steampunk world map, " +
+      "aged parchment texture, brass rivers, gear-shaped mountains, hand-drawn cartography style, " +
+      "no text, no labels, seamless landscape";
+    const mapUrl =
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(mapPrompt)}` +
+      `?width=1600&height=1200&nologo=true&seed=424242`;
+    this.load.image("world_map_bg", mapUrl);
   }
 
   async create() {
-    // 격자 배경
-    const grid = this.add.graphics();
-    grid.lineStyle(1, 0xffffff, 0.06);
-    for (let x = 0; x < MAP_W; x += 60) grid.lineBetween(x, 0, x, MAP_H);
-    for (let y = 0; y < MAP_H; y += 60) grid.lineBetween(0, y, MAP_W, y);
+   // 한반도 모티브 지도 배경
+    if (this.textures.exists("world_map_bg")) {
+      const bg = this.add.image(0, 0, "world_map_bg").setOrigin(0, 0);
+      bg.setDisplaySize(MAP_W, MAP_H);
+    } else {
+      // 이미지 로드 실패 시 기존 격자로 대체
+      const grid = this.add.graphics();
+      grid.lineStyle(1, 0xffffff, 0.06);
+      for (let x = 0; x < MAP_W; x += 60) grid.lineBetween(x, 0, x, MAP_H);
+      for (let y = 0; y < MAP_H; y += 60) grid.lineBetween(0, y, MAP_W, y);
+    }
 
     this.physics.world.setBounds(0, 0, MAP_W, MAP_H);
     this.cameras.main.setBounds(0, 0, MAP_W, MAP_H);
