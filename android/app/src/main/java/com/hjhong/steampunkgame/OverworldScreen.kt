@@ -1,5 +1,4 @@
 package com.hjhong.steampunkgame
-
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -12,16 +11,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlin.random.Random
-
 private const val MAP_W = 900f
 private const val MAP_H = 600f
 private const val TRAILER_RADIUS = 24f
 private const val MAP_SPEED = 5f
 private const val ENCOUNTER_DISTANCE_THRESHOLD = 350f
 private const val ENCOUNTER_CHANCE = 0.4f
-
 private val TRAILER_ICON_SIZE = 56.dp
-
 @Composable
 fun OverworldScreen(
     monsters: List<Monster>,
@@ -34,12 +30,10 @@ fun OverworldScreen(
     var traveledSinceLastCheck by remember { mutableStateOf(0f) }
     var encounterMonster by remember { mutableStateOf<Monster?>(null) }
     var isPaused by remember { mutableStateOf(false) }
-
     LaunchedEffect(isPaused) {
         while (!isPaused) {
             delay(16)
-
-           if (monsters.isNotEmpty()) {
+            if (monsters.isNotEmpty()) {
                 // 트레일러도 관성으로 이동 (트레일러답게 좀 더 미끄러지는 느낌)
                 val targetVelocity = joystickVector * MAP_SPEED
                 val inertiaFactor = 0.1f
@@ -47,16 +41,13 @@ fun OverworldScreen(
                     trailerVelocity.x + (targetVelocity.x - trailerVelocity.x) * inertiaFactor,
                     trailerVelocity.y + (targetVelocity.y - trailerVelocity.y) * inertiaFactor
                 )
-
                 if (trailerVelocity.getDistance() > 0.05f) {
                     val dx = trailerVelocity.x
                     val dy = trailerVelocity.y
                     val newX = (trailerPos.x + dx).coerceIn(TRAILER_RADIUS, MAP_W - TRAILER_RADIUS)
                     val newY = (trailerPos.y + dy).coerceIn(TRAILER_RADIUS, MAP_H - TRAILER_RADIUS)
                     trailerPos = Offset(newX, newY)
-
                     traveledSinceLastCheck += kotlin.math.sqrt(dx * dx + dy * dy)
-
                     if (traveledSinceLastCheck >= ENCOUNTER_DISTANCE_THRESHOLD) {
                         traveledSinceLastCheck = 0f
                         if (Random.nextFloat() < ENCOUNTER_CHANCE) {
@@ -66,7 +57,8 @@ fun OverworldScreen(
                     }
                 }
             }
-
+        } // 📌 while (!isPaused) 블록을 닫음
+    } // 📌 LaunchedEffect(isPaused) 블록을 닫음
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             Text(
@@ -74,7 +66,6 @@ fun OverworldScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(16.dp)
             )
-
             BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
@@ -84,7 +75,6 @@ fun OverworldScreen(
             ) {
                 val scaleX = maxWidth.value / MAP_W
                 val scaleY = maxHeight.value / MAP_H
-
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val gridSize = 60f
                     var gx = 0f
@@ -106,7 +96,6 @@ fun OverworldScreen(
                         gy += gridSize
                     }
                 }
-
                 GameEntity(
                     imagePath = playerImagePath,
                     fallbackColor = Color(0xFFFFC107),
@@ -115,7 +104,6 @@ fun OverworldScreen(
                     yDp = trailerPos.y * scaleY
                 )
             }
-
             Box(
                 modifier = Modifier.fillMaxWidth().padding(24.dp),
                 contentAlignment = Alignment.CenterStart
@@ -123,7 +111,6 @@ fun OverworldScreen(
                 Joystick(onDirectionChange = { joystickVector = it })
             }
         }
-
         if (encounterMonster != null) {
             val monster = encounterMonster!!
             AlertDialog(
