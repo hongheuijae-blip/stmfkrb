@@ -3,9 +3,9 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fetch = require("node-fetch");
 const fs = require("fs");
 const path = require("path");
+const Jimp = require("jimp");
 const { validateGameDataJson } = require("./schemaValidator");
 const { getDriveClient, uploadOrReplace } = require("./uploadToDrive");
-const Jimp = require("jimp");
 
 admin.initializeApp({
   credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
@@ -63,40 +63,8 @@ async function downloadImage(url, tmpPath) {
   fs.writeFileSync(tmpPath, buffer);
 }
 
-// 흰 배경을 투명하게 변환 (모서리 색상을 배경색으로 간주해 키잉)
-async function makeBackgroundTransparent(filePath) {
-  const image = await Jimp.read(filePath);
-  const w = image.bitmap.width;
-  const h = image.bitmap.height;
-
-  // 네 모서리 픽셀 평균으로 배경색 추정
-  const corners = [
-    image.getPixelColor(2, 2),
-    image.getPixelColor(w - 3, 2),
-    image.getPixelColor(2, h - 3),
-    image.getPixelColor(w - 3, h - 3),
-  ];
-  const rgbaList = corners.map((c) => Jimp.intToRGBA(c));
-  const bgR = rgbaList.reduce((s, c) => s + c.r, 0) / 4;
-  const bgG = rgbaList.reduce((s, c) => s + c.g, 0) / 4;
-  const bgB = rgbaList.reduce((s, c) => s + c.b, 0) / 4;
-
-  const threshold = 40; // 배경색과의 색상 거리 허용치
-
-  image.scan(0, 0, w, h, function (x, y, idx) {
-    const r = this.bitmap.data[idx + 0];
-    const g = this.bitmap.data[idx + 1];
-    const b = this.bitmap.data[idx + 2];
-    const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
-    if (dist < threshold) {
-      this.bitmap.data[idx + 3] = 0; // 알파값 0 = 투명
-    }
-  });
-
-  await image.writeAsync(filePath);
-}
-
 // 항목마다 완전히 다른 이미지가 나오도록 랜덤 seed + 상세 정보를 프롬프트에 포함
+// 스프라이트 용도로 사용할 수 있도록 단색 배경 + 아이콘 스타일로 통일
 function buildImageUrl(col, item) {
   let detail = "";
   switch (col) {
@@ -114,17 +82,64 @@ function buildImageUrl(col, item) {
       break;
   }
 
-  // 게임 스프라이트용: 단색 흰 배경 + 중앙 정렬 아이콘 스타일로 통일
-  const prompt = `steampunk game icon, ${col} concept, ${item.name}, ${detail}, ` +
+  const prompt =
+    `steampunk game icon, ${col} concept, ${item.name}, ${detail}, ` +
     `centered single subject, plain solid white background, no shadow, ` +
     `flat icon illustration style, clean silhouette, no text, no watermark`;
   const seed = Math.floor(Math.random() * 1000000);
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=768&nologo=true&seed=${seed}`;
 }
 
+// 흰 배경을 투명하게 변환 (모서리 색상을 배경색으로 간주해 키잉)
+async function makeBackgroundTransparent(filePath) {
+  const image = await Jimp.read(filePath);
+  const w = image.bitmap.width;
+  const h = image.bitmap.height;
+
+  const corners = [
+    image.getPixelColor(2, 2),
+    image.getPixelColor(w - 3, 2),
+    image.getPixelColor(2, h - 3),
+    image.getPixelColor(w - 3, h - 3),
+  ];
+  const rgbaList = corners.map((c) => Jimp.intToRGBA(c));
+  const bgR = rgbaList.reduce((s, c) => s + c.r, 0) / 4;
+  const bgG = rgbaList.reduce((s, c) => s + c.g, 0) / 4;
+  const bgB = rgbaList.reduce((s, c) => s + c.b, 0) / 4;
+
+  const threshold = 40;
+
+  image.scan(0, 0, w, h, function (x, y, idx) {
+    const r = this.bitmap.data[idx + 0];
+    const g = this.bitmap.data[idx + 1];
+    const b = this.bitmap.data[idx + 2];
+    const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
+    if (dist < threshold) {
+      this.bitmap.data[idx + 3] = 0;
+    }
+  });
+
+  await image.writeAsync(filePath);
+}
+
+// Gemini 503/429(일시적 과부하) 대응 자동 재시도
+async function generateWithRetry(prompt, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const result = await model.generateContent(prompt);
+      return result.response.text().trim();
+    } catch (e) {
+      const isRetryable = e.status === 503 || e.status === 429;
+      if (!isRetryable || i === maxRetries - 1) throw e;
+      const waitMs = (i + 1) * 15000;
+      console.log(`Gemini 재시도 ${i + 1}/${maxRetries} - ${waitMs / 1000}초 후 다시 시도`);
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+}
+
 async function main() {
-  const result = await model.generateContent(PROMPT);
-  let raw = result.response.text().trim();
+  let raw = await generateWithRetry(PROMPT);
 
   // Gemini가 가끔 ```json ... ``` 코드블록으로 감싸서 줄 수 있어서 제거
   raw = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
@@ -177,4 +192,7 @@ async function main() {
   console.log("완료: Firestore 저장 + 이미지 업로드");
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
