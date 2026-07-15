@@ -16,6 +16,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.State
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -39,8 +41,12 @@ fun CombatScreen(
     playerImagePath: String?,
     onExit: () -> Unit
 ) {
-    var boardingPhase by remember { mutableStateOf(BoardingPhase.BOARDING) }
+   var boardingPhase by remember { mutableStateOf(BoardingPhase.BOARDING) }
     var boardingProgress by remember { mutableStateOf(0f) }
+    var screenShakeTrigger by remember { mutableStateOf(0) } // 값이 바뀔 때마다 흔들림 재생
+    var screenShakeIntensity by remember { mutableStateOf(8f) }
+    var monsterHitTrigger by remember { mutableStateOf(0) }
+    var playerHitTrigger by remember { mutableStateOf(0) }
     // 기동 시퀀스: 약 1.6초에 걸쳐 게이지가 차오르고, "전투 개시" 표시 후 조작 풀림
     LaunchedEffect(Unit) {
         val steps = 32
@@ -95,6 +101,9 @@ fun CombatScreen(
                 val dmg = max(1, monster.attack - playerDefense / 2)
                 playerHp = (playerHp - dmg).coerceAtLeast(0)
                 floatingTexts = floatingTexts + FloatingText("-$dmg", playerPos, System.currentTimeMillis(), Color.Red)
+                playerHitTrigger++
+                screenShakeIntensity = (if (dmg >= basePlayerHp / 3) 16f else 8f)
+                screenShakeTrigger++
                 if (playerHp <= 0) result = "lose"
             }
             val now = System.currentTimeMillis()
@@ -188,18 +197,21 @@ fun CombatScreen(
                         })
                         Button(
                             onClick = {
-                                if (boardingPhase == BoardingPhase.PLAYING && !attackCooldown && result == null) {
-                                    val dx = playerPos.x - monsterPos.x
-                                    val dy = playerPos.y - monsterPos.y
-                                    val dist = sqrt(dx * dx + dy * dy)
-                                    if (dist <= ATTACK_RANGE) {
-                                        val dmg = max(1, playerAttack - monster.defense / 2)
-                                        monsterHp = (monsterHp - dmg).coerceAtLeast(0)
-                                        floatingTexts = floatingTexts + FloatingText("-$dmg", monsterPos, System.currentTimeMillis(), Color.Yellow)
-                                        if (monsterHp <= 0) result = "win"
-                                    }
-                                }
-                            },
+                        if (boardingPhase == BoardingPhase.PLAYING && !attackCooldown && result == null) {
+                            val dx = playerPos.x - monsterPos.x
+                            val dy = playerPos.y - monsterPos.y
+                            val dist = sqrt(dx * dx + dy * dy)
+                            if (dist <= ATTACK_RANGE) {
+                                val dmg = max(1, playerAttack - monster.defense / 2)
+                                monsterHp = (monsterHp - dmg).coerceAtLeast(0)
+                                floatingTexts = floatingTexts + FloatingText("-$dmg", monsterPos, System.currentTimeMillis(), Color.Yellow)
+                                monsterHitTrigger++
+                                screenShakeIntensity = (if (dmg >= monster.hp / 3) 14f else 6f)
+                                screenShakeTrigger++
+                                if (monsterHp <= 0) result = "win"
+                            }
+                        }
+                    },
                             modifier = Modifier.size(80.dp),
                             shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
