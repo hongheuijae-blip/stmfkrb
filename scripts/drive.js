@@ -1,5 +1,13 @@
 // scripts/drive.js
 const { google } = require("googleapis");
+const { Readable } = require("stream");
+
+/**
+ * Buffer → ReadableStream 변환
+ */
+function bufferToStream(buffer) {
+  return Readable.from(buffer);
+}
 
 /**
  * Google Drive OAuth2 Client 생성
@@ -19,19 +27,14 @@ function getDriveClient() {
 }
 
 /**
- * 파일명 sanitize:
- * - 작은따옴표(') → 쿼리 깨짐 방지
- * - 공백, 특수문자 → 안전하게 유지
+ * 파일명 sanitize
  */
 function sanitizeFilename(name) {
   return name.replace(/'/g, "\\'");
 }
 
 /**
- * Google Drive에 파일 업로드 또는 교체
- * - buffer 기반 업로드 (generate.js와 호환)
- * - 동일 이름 파일 존재 시 update
- * - 없으면 create
+ * Google Drive 업로드 또는 교체
  */
 async function uploadOrReplace(buffer, filename, mimeType) {
   const drive = getDriveClient();
@@ -41,10 +44,8 @@ async function uploadOrReplace(buffer, filename, mimeType) {
     throw new Error("DRIVE_IMAGE_FOLDER_ID 환경변수가 없습니다.");
   }
 
-  // 🔥 파일명 안전 처리
   const safeName = sanitizeFilename(filename);
 
-  // 🔥 Google Drive 검색 쿼리 (q)
   const q = `name = '${safeName}' and '${folderId}' in parents and trashed = false`;
 
   // 기존 파일 검색
@@ -54,7 +55,8 @@ async function uploadOrReplace(buffer, filename, mimeType) {
     spaces: "drive",
   });
 
-  // 기존 파일이 있으면 update
+  const stream = bufferToStream(buffer);
+
   if (existing.data.files.length > 0) {
     const fileId = existing.data.files[0].id;
 
@@ -62,14 +64,14 @@ async function uploadOrReplace(buffer, filename, mimeType) {
       fileId,
       media: {
         mimeType,
-        body: buffer,
+        body: stream,
       },
     });
 
     return fileId;
   }
 
-  // 없으면 새 파일 생성
+  // 새 파일 업로드
   const res = await drive.files.create({
     requestBody: {
       name: safeName,
@@ -77,7 +79,7 @@ async function uploadOrReplace(buffer, filename, mimeType) {
     },
     media: {
       mimeType,
-      body: buffer,
+      body: stream,
     },
   });
 
