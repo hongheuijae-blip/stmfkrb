@@ -1,7 +1,9 @@
 // scripts/drive.js
-const { google } = require('googleapis');
-const fs = require('fs');
+const { google } = require("googleapis");
 
+/**
+ * Google Drive OAuth2 Client 생성
+ */
 function getDriveClient() {
   const auth = new google.auth.OAuth2(
     process.env.GOOGLE_OAUTH_CLIENT_ID,
@@ -10,71 +12,79 @@ function getDriveClient() {
   );
 
   auth.setCredentials({
-    refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN
+    refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN,
   });
 
   return google.drive({ version: "v3", auth });
 }
 
-async function uploadToDrive(buffer, filename, mimeType) {
-  const drive = getDriveClient();
+/**
+ * 파일명 sanitize:
+ * - 작은따옴표(') → 쿼리 깨짐 방지
+ * - 공백, 특수문자 → 안전하게 유지
+ */
+function sanitizeFilename(name) {
+  return name.replace(/'/g, "\\'");
+}
 
+/**
+ * Google Drive에 파일 업로드 또는 교체
+ * - buffer 기반 업로드 (generate.js와 호환)
+ * - 동일 이름 파일 존재 시 update
+ * - 없으면 create
+ */
+async function uploadOrReplace(buffer, filename, mimeType) {
+  const drive = getDriveClient();
   const folderId = process.env.DRIVE_IMAGE_FOLDER_ID;
+
   if (!folderId) {
     throw new Error("DRIVE_IMAGE_FOLDER_ID 환경변수가 없습니다.");
   }
 
+  // 🔥 파일명 안전 처리
+  const safeName = sanitizeFilename(filename);
+
+  // 🔥 Google Drive 검색 쿼리 (q)
+  const q = `name = '${safeName}' and '${folderId}' in parents and trashed = false`;
+
+  // 기존 파일 검색
+  const existing = await drive.files.list({
+    q,
+    fields: "files(id)",
+    spaces: "drive",
+  });
+
+  // 기존 파일이 있으면 update
+  if (existing.data.files.length > 0) {
+    const fileId = existing.data.files[0].id;
+
+    await drive.files.update({
+      fileId,
+      media: {
+        mimeType,
+        body: buffer,
+      },
+    });
+
+    return fileId;
+  }
+
+  // 없으면 새 파일 생성
   const res = await drive.files.create({
     requestBody: {
-      name: filename,
-      parents: [folderId]
+      name: safeName,
+      parents: [folderId],
     },
     media: {
       mimeType,
-      body: buffer
-    }
+      body: buffer,
+    },
   });
 
   return res.data.id;
 }
 
-// 📌 추가: 동일 파일명 존재 시 덮어쓰기 지원하는 함수
-async function uploadOrReplace(drive, folderId, filePath, filename, mimeType) {
-  const response = await drive.files.list({
-    q: `name = '${filename}' and '${folderId}' in parents and trashed = false`,
-    fields: 'files(id)',
-    spaces: 'drive',
-  });
-
-  const files = response.data.files;
-  const media = {
-    mimeType: mimeType,
-    body: fs.createReadStream(filePath)
-  };
-
-  if (files && files.length > 0) {
-    // 동일 이름의 파일이 이미 있으면 update 실행
-    const fileId = files[0].id;
-    await drive.files.update({
-      fileId: fileId,
-      media: media
-    });
-    return fileId;
-  } else {
-    // 없으면 신규 create 실행
-    const res = await drive.files.create({
-      requestBody: {
-        name: filename,
-        parents: [folderId]
-      },
-      media: media
-    });
-    return res.data.id;
-  }
-}
-
 module.exports = {
   getDriveClient,
-  uploadToDrive,
-  uploadOrReplace // 📌 내보내기에 추가
+  uploadOrReplace,
 };
